@@ -47,19 +47,12 @@ cat("Average OHE CV rmse:",mean(do.call(c,lapply(xgb.folds.ohe,function(x){x$sco
 # Basic Tuning - bagged XGBoost -------------------------------------------
 
 # Train the model
+
 set.seed(100)
-
-ord.xg1 <- do.call(xgboost,
-                   c(list(data = ord.train.s,
-                          label = y.train),
-                     XGB_PARS))
-
-# Make prediction
-pred <- predict(ord.xg1, ord.test.s)
-
 runs <- 200
 train.ind <- 1:length(y.train)
 train.length <- length(y.train)
+
 for (n in 1:runs) {
   print(n)
   tmpS1 <- sample(train.ind,size=train.length,replace=T)
@@ -77,22 +70,21 @@ for (n in 1:runs) {
   tmpX3 <- predict(cst, as.matrix(ord.test.s), type="response")
   
   bst <- do.call(xgboost,
+                 
+                 
                  c(list(data = cbind(tmpX1,tmpX2),
                         label = tmpY1),
                    XGB_PARS))
   
   # Make prediction
   pred0 = predict(bst,cbind(ord.test.s,tmpX3))
-  pred = pred + pred0
+  if (n == 1) {
+    pred <- pred0
+  } else {
+    pred <- pred + pred0
+  }
 }
 
-ohe.xg1 <- do.call(xgboost,
-                   c(list(data = ord.train.s,
-                          label = y.train),
-                     XGB_PARS))
-
-pred0 <- predict(ohe.xg1, ohe.test.s)
-pred <- pred + pred0
 for (n in 1:runs) {
   print(n)
   tmpS1 <- sample(train.ind,size=train.length,replace=T)
@@ -113,13 +105,16 @@ for (n in 1:runs) {
                  c(list(data = cbind(tmpX1,tmpX2),
                         label = tmpY1),
                    XGB_PARS))
-  
   # Make prediction
   pred0 = predict(bst,cbind(ohe.test.s,tmpX3))
-  pred = pred + pred0
+  if (n == 1) {
+    pred <- pred0
+  } else {
+    pred <- pred + pred0
+  }
 }
 
-pred.avg = pred/(2*runs+2)
+pred.avg = pred/(2*runs)
 pred.mat <- cbind(Id.test, pred.avg)
 write.csv(pred.mat, file = "sub1.csv")
 
