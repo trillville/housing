@@ -9,12 +9,6 @@ raw.all <- bind_rows(raw.train, raw.test)
 
 # Data Cleaning -----------------------------------------------------------
 
-#first, get an idea for predictors with lots of missing data
-# for (i in 1:ncol(ord.mat)) {
-#   na.frac <- sum(is.na(ord.mat[,i]) == TRUE)/nrow(ord.mat)
-#   colname <- colnames(ord.mat)[i]
-#   print(c(colname,na.frac))
-# }
 
 # Replacing missing values (courtesy of JMT5802)
 # Determine data types in the data set
@@ -48,7 +42,7 @@ dat.ord <- mutate(dat.all,
                   Street = as.factor(Street),
                   Alley = as.factor(Alley),
                   LotShape = as.numeric(factor(LotShape, levels = c("Reg", "IR1", "IR2", "IR3"), ordered = TRUE)),
-                  Utilities = as.numeric(factor(Utilities, levels = c("AllPub", "NoSewr", "NoSeWa", "ELO"), ordered = TRUE)),
+                  Utilities = as.numeric(factor(Utilities, levels = c("AllPub", "NoSewr", "NoSeWa", "ELO", "*MISSING*"), ordered = TRUE)),
                   LotConfig = as.factor(LotConfig),
                   LandSlope = as.numeric(factor(LandSlope, levels = c("Gtl", "Mod", "Sev"), ordered = TRUE)),
                   Neighborhood = as.factor(Neighborhood),
@@ -85,8 +79,8 @@ dat.ord <- mutate(dat.all,
                   SF1stFlr = `1stFlrSF`,
                   BsmtFullBath = ifelse(is.na(BsmtQual) == TRUE, 0, BsmtFullBath),
                   BsmtHalfBath = ifelse(is.na(BsmtQual) == TRUE, 0, BsmtHalfBath),
-                  KitchenQual = as.numeric(factor(KitchenQual, levels = c("Ex", "Gd", "TA", "Fa", "Po"), ordered = TRUE)),
-                  Functional = as.numeric(factor(Functional, levels = c("Typ", "Min1", "Min2", "Mod", "Maj1", "Maj2", "Sev", "Sal"), ordered = TRUE)),
+                  KitchenQual = as.numeric(factor(KitchenQual, levels = c("Ex", "Gd", "TA", "Fa", "Po", "*MISSING*"), ordered = TRUE)),
+                  Functional = as.numeric(factor(Functional, levels = c("Typ", "Min1", "Min2", "Mod", "Maj1", "Maj2", "Sev", "Sal", "*MISSING*"), ordered = TRUE)),
                   FireplaceQu = as.numeric(factor(FireplaceQu, levels = c("Ex", "Gd", "TA", "Fa", "Po", "*MISSING*"), ordered = TRUE)),
                   GarageType = as.factor(GarageType),
                   GarageFinish = as.factor(GarageFinish),
@@ -116,8 +110,8 @@ dat.ohe <- mutate(dat.all,
                   Condition2 = as.factor(Condition2),
                   BldgType = as.factor(BldgType),
                   HouseStyle = as.factor(HouseStyle), #should probably be ordinal
-                  OverallQual = as.factor(OverallQual),
-                  OverallCond = as.factor(OverallCond), 
+                  OverallQual = as.numeric(factor(OverallQual, ordered = TRUE)),
+                  OverallCond = as.numeric(factor(OverallCond, ordered = TRUE)), 
                   RoofStyle = as.factor(RoofStyle),
                   RoofMatl = as.factor(RoofMatl),
                   Exterior1st = as.factor(Exterior1st), # these two should probably be done as one-hot encoding
@@ -162,13 +156,35 @@ dat.ohe <- mutate(dat.all,
   select(everything(), -`1stFlrSF`, -`2ndFlrSF`, -`3SsnPorch`)
 
 
-# table(dat.all$HouseStyle)
-# 
-# ggplot(data = dat.all, aes(x = GrLivArea, y = SalePrice)) +
-#   geom_point()
+# Prepare data for models -------------------------------------------------
+test <- which(is.na(dat.all$SalePrice))
+train <- setdiff(1:nrow(dat.all), test)
+
+y.train <- dat.all$SalePrice[train]
+Id.train <- dat.all$Id[train]
+Id.test <- dat.all$Id[test]
+
+# workaround to get sparse.model.matrix to work with NAs - REVIST
+previous_na_action <- options('na.action')
+options(na.action='na.pass')
+
+ord.train.s <- sparse.model.matrix(SalePrice ~ . -1 -Id, data = dat.ord[train, ]) 
+ord.test.s <- sparse.model.matrix(~ . -1 -Id -SalePrice, data = dat.ord[test, ]) 
+
+ohe.train.s <- sparse.model.matrix(SalePrice ~ . -1 -Id, data = dat.ohe[train, ]) 
+ohe.test.s <- sparse.model.matrix(~ . -1 -Id -SalePrice, data = dat.ohe[test, ]) 
+
+options(na.action=previous_na_action$na.action)
+
+set.seed(13)
+cv.folds <- createFolds(y.train, k=5)
 
 
+# MISC --------------------------------------------------------------------
 
-
-
-
+# Get an idea for predictors with lots of missing data
+for (i in 1:ncol(raw.all)) {
+  na.frac <- sum(is.na(raw.all[,i]) == TRUE)/nrow(raw.all)
+  colname <- colnames(raw.all)[i]
+  print(c(colname,na.frac))
+}
