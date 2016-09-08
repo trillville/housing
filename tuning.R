@@ -34,9 +34,6 @@ xgb.cv.results <- train(x = ord.train.s,
                         metric = "RMSE",
                         method = "xgbTree")
 
-# basic model using meta bagging
-# should inform feature selection and provide a performance baseline
-
 xgb.folds.ord <- llply(cv.folds, trainOneFold, ord.train.s, y.train, Id.train)
 xgb.folds.ohe <- llply(cv.folds, trainOneFold, ohe.train.s, y.train, Id.train)
 
