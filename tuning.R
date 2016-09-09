@@ -7,10 +7,10 @@ if (tune.bays == TRUE) {
                               bounds = list(max.depth = c(1L, 15L),
                                             subsample = c(0.3, 0.9),
                                             colsample_bytree = c(0.3, 0.9),
-                                            eta = c(0.01, 0.3),
+                                            eta = c(0.01, 0.1),
                                             min_child_weight = c(1L,15L),
-                                            nrounds = c(100L,1200L)),
-                              init_points = 10, n_iter = 30, acq = "ucb", 
+                                            nrounds = c(500L,1200L)),
+                              init_points = 15, n_iter = 30, acq = "ucb", 
                               kappa = 2.576, eps = 0, verbose = TRUE)
 }
 # bayesian optimization suggests eta = .1, mad.depth = 15, subsample = .9, colsample_bytree = .8267
