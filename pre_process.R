@@ -128,9 +128,12 @@ ohe.test.xgb <- xgb.DMatrix(data = ohe.train.s)
 
 # TSNE --------------------------------------------------------------------
 
-tsne <- Rtsne(as.matrix(dat.ord), check_duplicates = FALSE, pca = FALSE, 
-              perplexity=25, theta=0.5, dims=2)
-
+run.tsne <- FALSE
+if (run.tsne == TRUE) {
+  tsne <- Rtsne(as.matrix(ord.train.s), check_duplicates = FALSE, pca = FALSE, 
+                perplexity=25, theta=0.5, dims=2)
+  #plot(tsne$Y)
+}
 
 
 #options(na.action=previous_na_action$na.action)
