@@ -131,8 +131,10 @@ ohe.test.xgb <- xgb.DMatrix(data = ohe.train.s)
 run.tsne <- FALSE
 if (run.tsne == TRUE) {
   tsne <- Rtsne(as.matrix(ord.train.s), check_duplicates = FALSE, pca = FALSE, 
-                perplexity=25, theta=0.5, dims=2)
-  #plot(tsne$Y)
+                perplexity=25, theta=0.1, dims=2)
+  tsne.df <- data.frame(cbind(tsne$Y, y.train/1000))
+  qplot(tsne.df$X1, tsne.df$X2, data = tsne.df, color = tsne.df$X3) +
+    scale_colour_gradient(limits=c(34.90, 250),low="red",high="white")
 }
 
 
