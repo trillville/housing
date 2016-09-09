@@ -5,6 +5,8 @@
 # a second set (to be stored in utils.R) will correspond to the final tuned
 # parameters to be used in model building.
 
+source("pre_process.R")
+
 CARET.TRAIN.PARMS <- list(method="xgbTree")   
 
 CARET.TUNE.GRID <-  expand.grid(nrounds=seq(600,1000, by = 200), 
@@ -46,70 +48,54 @@ cat("Average OHE CV rmse:",mean(do.call(c,lapply(xgb.folds.ohe,function(x){x$sco
 # Train the model
 
 set.seed(100)
-runs <- 200
+runs <- 10
 train.ind <- 1:length(y.train)
 train.length <- length(y.train)
 
 for (n in 1:runs) {
-  print(n)
+  cat("Run Number:", n)
   tmpS1 <- sample(train.ind,size=train.length,replace=T)
   tmpS2 <- setdiff(train.ind,tmpS1)
   
-  tmpX2 <- ord.train.s[tmpS2,]
+  ord.tmpX2 <- ord.train.s[tmpS2,]
+  ohe.tmpX2 <- ohe.train.s[tmpS2,]
   tmpY2 <- y.train[tmpS2]
   
-  cst <- randomForest(x = as.matrix(tmpX2), y = tmpY2, replace=F, ntree=100, do.trace=F, mtry = 90)
+  ord.rf1 <- randomForest(x = as.matrix(ord.tmpX2), y = tmpY2, replace=F, ntree=100, do.trace=F, mtry = 90)
+  ohe.rf1 <- randomForest(x = as.matrix(ohe.tmpX2), y = tmpY2, replace=F, ntree=100, do.trace=F, mtry = 90)
   
-  tmpX1 <- ord.train.s[tmpS1,]
+  ord.tmpX1 <- ord.train.s[tmpS1,]
+  ohe.tmpX1 <- ohe.train.s[tmpS1,]
   tmpY1 <- y.train[tmpS1]
   
-  tmpX2 <- predict(cst, as.matrix(tmpX1), type="response")
-  tmpX3 <- predict(cst, as.matrix(ord.test.s), type="response")
+  ord.tmpX2 <- predict(ord.rf1, as.matrix(ord.tmpX1), type="response")
+  ord.tmpX3 <- predict(ord.rf1, as.matrix(ord.test.s), type="response")
+  ohe.tmpX2 <- predict(ohe.rf1, as.matrix(ohe.tmpX1), type="response")
+  ohe.tmpX3 <- predict(ohe.rf1, as.matrix(ohe.test.s), type="response")
   
-  bst <- do.call(xgboost,
-                 c(list(data = cbind(tmpX1,tmpX2),
+  ord.bst <- do.call(xgboost,
+                 c(list(data = cbind(ord.tmpX1,ord.tmpX2),
+                        label = tmpY1),
+                   XGB_PARS))
+  
+  ohe.bst <- do.call(xgboost,
+                 c(list(data = cbind(ohe.tmpX1,ohe.tmpX2),
                         label = tmpY1),
                    XGB_PARS))
   
   # Make prediction
-  pred0 = predict(bst,cbind(ord.test.s,tmpX3))
+  ord.pred0 = predict(ord.bst,cbind(ord.test.s, ord.tmpX3))
+  ohe.pred0 = predict(ohe.bst,cbind(ohe.test.s, ohe.tmpX3))
   if (n == 1) {
-    pred <- pred0
+    ord.pred <- ord.pred0
+    ohe.pred <- ohe.pred0
   } else {
-    pred <- pred + pred0
+    ord.pred <- ord.pred + ord.pred0
+    ohe.pred <- ohe.pred + ohe.pred0
   }
 }
-
-for (n in 1:runs) {
-  print(n)
-  tmpS1 <- sample(train.ind,size=train.length,replace=T)
-  tmpS2 <- setdiff(train.ind,tmpS1)
-  
-  tmpX2 <- ohe.train.s[tmpS2,]
-  tmpY2 <- y.train[tmpS2]
-  
-  cst <- randomForest(x = as.matrix(tmpX2), y = tmpY2, replace=F, ntree=100, do.trace=F, mtry = 90)
-  
-  tmpX1 <- ohe.train.s[tmpS1,]
-  tmpY1 <- y.train[tmpS1]
-  
-  tmpX2 <- predict(cst, as.matrix(tmpX1), type="response")
-  tmpX3 <- predict(cst, as.matrix(ohe.test.s), type="response")
-  
-  bst <- do.call(xgboost,
-                 c(list(data = cbind(tmpX1,tmpX2),
-                        label = tmpY1),
-                   XGB_PARS))
-  # Make prediction
-  pred0 = predict(bst,cbind(ohe.test.s,tmpX3))
-  if (n == 1) {
-    pred <- pred0
-  } else {
-    pred <- pred + pred0
-  }
-}
-
-pred.avg = pred/(2*runs)
+pred.agg <- ord.pred + ohe.pred
+pred.avg = pred.agg/(2*runs)
 pred.mat <- cbind(Id.test, pred.avg)
 write.csv(pred.mat, file = "sub1.csv")
 

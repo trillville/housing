@@ -1,5 +1,5 @@
 # Load Data ---------------------------------------------------------------
-r
+
 # load libraries and functions needed
 source("utils.R")
 
@@ -21,7 +21,7 @@ names(DATA_ATTR_TYPES) <- unique_data_types
 
 num_attr <- intersect(PREDICTOR_ATTR,DATA_ATTR_TYPES$integer)
 for (x in num_attr){
-  raw.all[[x]][is.na(aw.all[[x]])] <- -1
+  raw.all[[x]][is.na(raw.all[[x]])] <- -1
 }
 
 char_attr <- intersect(PREDICTOR_ATTR,DATA_ATTR_TYPES$character)
@@ -70,7 +70,7 @@ dat.ohe <- mutate(dat.all,
                   OverallCond = as.numeric(factor(OverallCond, ordered = TRUE))
                   ) 
 
-# convert factors to numeric
+# convert characters to factors
 data_types <- sapply(PREDICTOR_ATTR,function(x){class(raw.all[[x]])})
 unique_data_types <- unique(data_types)
 
