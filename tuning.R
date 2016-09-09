@@ -67,8 +67,6 @@ for (n in 1:runs) {
   tmpX3 <- predict(cst, as.matrix(ord.test.s), type="response")
   
   bst <- do.call(xgboost,
-                 
-                 
                  c(list(data = cbind(tmpX1,tmpX2),
                         label = tmpY1),
                    XGB_PARS))

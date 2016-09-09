@@ -52,7 +52,6 @@ XGB_PARS <- list(objective = "reg:linear",
 # Functions ---------------------------------------------------------------
 
 trainOneFold <- function(fold, predictors, y, ID) {
-  
   # fit model based on all training data except for current fold
   set.seed(825)
   # fit <- do.call(train,
