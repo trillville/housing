@@ -1,5 +1,4 @@
 # Load Data ---------------------------------------------------------------
-
 raw.train <- read_csv("train.csv")
 raw.test <- read_csv("test.csv")
 raw.all <- bind_rows(raw.train, raw.test)
@@ -115,28 +114,33 @@ dat.ohe <- dat.ohe[, PREDICTOR_ATTR]
 #previous_na_action <- options('na.action')
 #options(na.action='na.pass')
 
-ord.train.s <- sparse.model.matrix(~ . -1, data = dat.ord[train, ])
-ord.train.xgb <- xgb.DMatrix(data = ord.train.s, label = y.train)
-ord.test.s <- sparse.model.matrix(~ . -1, data = dat.ord[test, ]) 
-ord.test.xgb <- xgb.DMatrix(data = ord.train.s)
-
-ohe.train.s <- sparse.model.matrix(~ . -1, data = dat.ohe[train, ])
-ohe.train.xgb <- xgb.DMatrix(data = ohe.train.s, label = y.train)
-ohe.test.s <- sparse.model.matrix(~ . -1, data = dat.ohe[test, ]) 
-ohe.test.xgb <- xgb.DMatrix(data = ohe.train.s)
-
+ord.all <- sparse.model.matrix(~ . -1, data = dat.ord)
+ohe.all <-sparse.model.matrix(~ . -1, data = dat.ohe) 
 
 # TSNE --------------------------------------------------------------------
 
-run.tsne <- FALSE
-if (run.tsne == TRUE) {
-  tsne <- Rtsne(as.matrix(ord.train.s), check_duplicates = FALSE, pca = FALSE, 
+use.tsne <- TRUE
+if (use.tsne == TRUE) {
+  tsne <- Rtsne(as.matrix(ohe.all), check_duplicates = FALSE, pca = FALSE, 
                 perplexity=25, theta=0.1, dims=2)
-  tsne.df <- data.frame(cbind(tsne$Y, y.train/1000))
+  tsne.df <- data.frame(cbind(tsne$Y[train,], y.train/1000))
   qplot(tsne.df$X1, tsne.df$X2, data = tsne.df, color = tsne.df$X3) +
     scale_colour_gradient(limits=c(34.90, 250),low="red",high="white")
+  
+  colnames(tsne$Y) <- c("TSNE1", "TSNE2")
+  # need to determine whether or not it makes sense to do TSNE for both OHE and ORD encodings
+  ord.train.s <- cbind(ord.all[train, ], tsne$Y[train, ])
+  ord.test.s <- cbind(ord.all[test, ], tsne$Y[test, ])
+  ohe.train.s <- cbind(ohe.all[train, ], tsne$Y[train, ])
+  ohe.test.s <- cbind(ohe.all[test, ], tsne$Y[test, ])
 }
 
+# Pointers to xgb matrices
+ord.train.xgb <- xgb.DMatrix(data = ord.train.s, label = y.train)
+ord.test.xgb <- xgb.DMatrix(data = ord.train.s)
+
+ohe.train.xgb <- xgb.DMatrix(data = ohe.train.s, label = y.train)
+ohe.test.xgb <- xgb.DMatrix(data = ohe.train.s)
 
 #options(na.action=previous_na_action$na.action)
 # MISC --------------------------------------------------------------------
