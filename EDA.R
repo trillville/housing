@@ -35,3 +35,69 @@ scatterplot(SalePrice ~ YearBuilt, data=raw.all,  xlab="Year Built", ylab="Sale 
 scatterplot(SalePrice ~ YrSold, data=raw.all,  xlab="Year Sold", ylab="Sale Price", grid=FALSE)
 scatterplot(SalePrice ~ `1stFlrSF`, data=raw.all,  xlab="Square Footage Floor 1", ylab="Sale Price", grid=FALSE)
 
+
+
+# Boruta Analysis ---------------------------------------------------------
+
+# ordinal encoding
+response <- y.train
+sample <- select(dat.ord, everything(), -Id, -SalePrice)
+set.seed(69)
+bor.results <- Boruta(sample[train, ], 
+                      response,
+                      maxRuns = 200,
+                      doTrace = 2)
+
+results <- as.data.frame(bor.results$finalDecision)
+names <- rownames(test)
+final <- data.frame(cbind(names, results[[1]]))
+
+boruta.ord.tentative <- as.character(final$names[which(final$V2 == 1)])
+boruta.ord.confirmed <- as.character(final$names[which(final$V2 == 2)])
+boruta.ord.rejected <- as.character(final$names[which(final$V2 == 3)])
+
+# OHE encoding
+
+
+
+# Looking at/handling related variables -----------------------------------
+
+names <- colnames(dat.all)
+garage.vars <- grep("garage", names, ignore.case = TRUE, value = TRUE)
+garage.dat <- dat.all[,garage.vars]
+# looks good!
+
+fire.vars <- grep("fire", names, ignore.case = TRUE)
+fire.dat <- dat.all[,fire.vars]
+table(fire.dat, useNA = "always")
+# looks good!
+
+cond.vars <- grep("Condition", names, ignore.case = TRUE)
+cond.dat <- dat.all[,cond.vars]
+cond.dat <- cond.dat[,-3]
+table(fire.dat, useNA = "always")
+
+year.vars <- grep("year", names, ignore.case = TRUE)
+table(dat.all[,year.vars[1]], useNA = "always")
+table(dat.all[,year.vars[2]], useNA = "always")
+
+table(dat.all[,c("Exterior1st", "Exterior2nd")])
+
+qual.vars <- grep("qual", names, ignore.case = TRUE, value = TRUE)
+table(dat.all[,c(qual.vars[c(1,6)])])
+
+miss.garagequal <- dat.all[which(dat.all$GarageQual == "*MISSING*"),garage.vars]
+miss.garagcars <- dat.all[which(dat.all$GarageCars < 0),garage.vars]
+miss.garage <- dat.all[which(dat.all$GarageArea <= 0),garage.vars]
+
+bsmt.vars <- grep("bsmt", names, ignore.case = TRUE, value = TRUE)
+garage <- dat.all[,bsmt.vars]
+table(dat.all[,c(bsmt.vars[c(1,4)])])
+
+table(dat.all$GarageYrBlt)
+
+for (i in 1:ncol(num.dat)) {
+  na.frac <- sum(num.dat[,i] < 0)/nrow(num.dat)
+  colname <- colnames(num.dat)[i]
+  print(c(colname,na.frac))
+}

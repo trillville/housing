@@ -4,6 +4,7 @@
 library(Matrix)
 library(xgboost)
 library(randomForest)
+library(rBayesianOptimization)
 library(caret)
 library(plyr)
 library(dplyr)
@@ -12,33 +13,30 @@ library(stringr)
 #library(dummies)
 library(Metrics)
 library(readr)
+library(Boruta)
 #library(kernlab)
 #library(data.table)
 
 
 # Constants ---------------------------------------------------------------
 
-# incorporate results of Boruta analysis
-CONFIRMED_ATTR <- c("MSSubClass","MSZoning","LotArea","LotShape","LandContour","Neighborhood",
-                    "BldgType","HouseStyle","OverallQual","OverallCond","YearBuilt",
-                    "YearRemodAdd","Exterior1st","Exterior2nd","MasVnrArea","ExterQual",
-                    "Foundation","BsmtQual","BsmtCond","BsmtFinType1","BsmtFinSF1",
-                    "BsmtFinType2","BsmtUnfSF","TotalBsmtSF","HeatingQC","CentralAir",
-                    "X1stFlrSF","X2ndFlrSF","GrLivArea","BsmtFullBath","FullBath","HalfBath",
-                    "BedroomAbvGr","KitchenAbvGr","KitchenQual","TotRmsAbvGrd","Functional",
-                    "Fireplaces","FireplaceQu","GarageType","GarageYrBlt","GarageFinish",
-                    "GarageCars","GarageArea","GarageQual","GarageCond","PavedDrive","WoodDeckSF",
-                    "OpenPorchSF","Fence")
+# incorporate results of Boruta analysis (using ordinal data set)
+CONFIRMED_ATTR <- c("MSSubClass","MSZoning",     "LotArea",      "LandContour",  "Neighborhood", "BldgType",     "HouseStyle",   "OverallQual", 
+                    "OverallCond",  "YearBuilt",    "YearRemodAdd", "Exterior1st",  "Exterior2nd",  "MasVnrType",   "MasVnrArea",   "ExterQual",   
+                    "Foundation",   "BsmtQual",     "BsmtCond",     "BsmtExposure", "BsmtFinType1", "BsmtFinSF1",   "BsmtUnfSF",    "TotalBsmtSF", 
+                    "HeatingQC",    "CentralAir",   "GrLivArea",    "BsmtFullBath", "FullBath",     "HalfBath",     "BedroomAbvGr", "KitchenAbvGr",
+                    "KitchenQual",  "TotRmsAbvGrd", "Functional",   "Fireplaces",   "FireplaceQu",  "GarageType",   "GarageYrBlt",  "GarageFinish",
+                    "GarageCars",   "GarageArea",   "GarageQual",   "GarageCond",   "PavedDrive",   "WoodDeckSF",   "OpenPorchSF",  "SF2ndFlr",    
+                    "SF1stFlr", "Fence")
 
-TENTATIVE_ATTR <- c("Alley","LandSlope","Condition1","RoofStyle","MasVnrType","BsmtExposure",
-                    "Electrical","EnclosedPorch","SaleCondition")
+TENTATIVE_ATTR <- c("Alley","LotShape","LandSlope","Condition1","RoofStyle","Electrical","SaleCondition")
 
-REJECTED_ATTR <- c("LotFrontage","Street","Utilities","LotConfig","Condition2","RoofMatl",
-                   "ExterCond","BsmtFinSF2","Heating","LowQualFinSF","BsmtHalfBath",
-                   "X3SsnPorch","ScreenPorch","PoolArea","PoolQC","MiscFeature","MiscVal",
-                   "MoSold","YrSold","SaleType")
+REJECTED_ATTR <- c("LotFrontage",   "Street",        "Utilities",     "LotConfig",     "Condition2",    "RoofMatl",      "ExterCond",     "BsmtFinType2", 
+                   "BsmtFinSF2",    "Heating",       "LowQualFinSF",  "BsmtHalfBath",  "EnclosedPorch", "ScreenPorch",   "PoolArea",      "PoolQC",       
+                   "MiscFeature",   "MiscVal",       "MoSold",        "YrSold",        "SaleType",     "Porch3Ssn")
 
-PREDICTOR_ATTR <- c(CONFIRMED_ATTR,TENTATIVE_ATTR,REJECTED_ATTR)
+PREDICTOR_ATTR <- c(CONFIRMED_ATTR,TENTATIVE_ATTR)
+ALL_ATTR <- c(CONFIRMED_ATTR,TENTATIVE_ATTR,REJECTED_ATTR)
 
 XGB_PARS <- list(objective = "reg:linear",
                  eval_metric = "rmse",
@@ -81,3 +79,33 @@ trainOneFold <- function(fold, predictors, y, ID) {
 logRMSE <- function(actual, predicted) {
   return (sqrt(mean((log(actual) - log(predicted))^2)))
 }
+
+runBoruta <- function(){
+  
+  # ordinal encoding
+  response <- y.train
+  sample <- select(dat.ord, everything(), -Id, -SalePrice)
+  set.seed(69)
+  bor.results <- Boruta(sample[train, ], 
+                        response,
+                        maxRuns = 200,
+                        doTrace = 2)
+  
+  results <- as.data.frame(bor.results$finalDecision)
+  names <- rownames(test)
+  final <- data.frame(cbind(names, results[[1]]))
+  
+  boruta.ord.tentative <- as.character(final$names[which(final$V2 == 1)])
+  boruta.ord.confirmed <- as.character(final$names[which(final$V2 == 2)])
+  boruta.ord.rejected <- as.character(final$names[which(final$V2 == 3)])
+  ans <- list(bor.results,
+              boruta.ord,tentative,
+              boruta.confirmed,
+              boruta.rejected)
+  return(ans)
+}
+
+
+
+
+

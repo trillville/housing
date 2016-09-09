@@ -1,5 +1,3 @@
-# Tuning --------------------------------------------------------------
-
 # caret xgboost tuning parameters
 # note - current thought is that these should be the TUNING parameters,
 # a second set (to be stored in utils.R) will correspond to the final tuned
@@ -28,13 +26,17 @@ CARET.TRAIN.OTHER.PARMS <- list(trControl=CARET.TRAIN.CTRL,
                                 tuneGrid=CARET.TUNE.GRID,
                                 metric="RMSE")
 
-# tune xgboost hyperparameters
+# tune xgboost hyperparameters using caret
 xgb.cv.results <- train(x = ord.train.s,
                         y = y.train,
                         tuneGrid = CARET.TUNE.GRID,
                         trControl = CARET.TRAIN.CTRL,
                         metric = "RMSE",
                         method = "xgbTree")
+
+# tunexgboost hyperparameters using bayesian optimization (TODO)
+
+
 
 xgb.folds.ord <- llply(cv.folds, trainOneFold, ord.train.s, y.train, Id.train)
 xgb.folds.ohe <- llply(cv.folds, trainOneFold, ohe.train.s, y.train, Id.train)

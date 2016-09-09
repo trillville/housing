@@ -13,34 +13,49 @@ raw.all <- bind_rows(raw.train, raw.test)
 # Replacing missing values (courtesy of JMT5802)
 # characters = *MISSING* 
 # numeric = -1
-data_types <- sapply(PREDICTOR_ATTR,function(x){class(raw.all[[x]])})
+dat.all <- raw.all
+
+data_types <- sapply(ALL_ATTR,function(x){class(dat.all[[x]])})
 unique_data_types <- unique(data_types)
 
 DATA_ATTR_TYPES <- lapply(unique_data_types,function(x){ names(data_types[data_types == x])})
 names(DATA_ATTR_TYPES) <- unique_data_types
 
-num_attr <- intersect(PREDICTOR_ATTR,DATA_ATTR_TYPES$integer)
+num_attr <- DATA_ATTR_TYPES$integer
 for (x in num_attr){
-  raw.all[[x]][is.na(raw.all[[x]])] <- -1
+  dat.all[[x]][is.na(dat.all[[x]])] <- -1
 }
 
-char_attr <- intersect(PREDICTOR_ATTR,DATA_ATTR_TYPES$character)
+char_attr <- DATA_ATTR_TYPES$character
 for (x in char_attr){
-  raw.all[[x]][is.na(raw.all[[x]])] <- "*MISSING*"
-  #raw.all[[x]] <- factor(raw.all[[x]])
+  dat.all[[x]][is.na(dat.all[[x]])] <- "*MISSING*"
+  #dat.all[[x]] <- factor(dat.all[[x]])
 }
 
 # data modifications based on EDA
-dat.all <- raw.all
+dat.all$MSSubClass[which(dat.all$MSSubClass == 150)] <- 50
+dat.all$MSSubClass[which(dat.all$MSSubClass == 45)] <- 50
+dat.all$Condition2[which(dat.all$Condition1 == dat.all$Condition2)] <- "Norm"
+dat.all$KitchenQual[which(dat.all$KitchenQual == "*MISSING*")] <- "TA" # only one house, based on overallqual looks like TA most likely value
+dat.all$GarageCars[which(dat.all$GarageCars == -1)] <- 0 
+dat.all$GarageArea[which(dat.all$GarageArea == -1)] <- 0 
+#dat.all$FenceQual <- ifelse(dat.all$Fence == "GdPrv" | dat.all$Fence == "GdWo", "Gd", # need to check if this replacement improves performance
+#                            ifelse(dat.all$Fence == "*MISSING*", "*MISSING*", "Po"))
+dat.all$Electrical[which(dat.all$Electrical !="SBrkr")] <- "Other"
+dat.all$Functional[which(dat.all$Functional =="*MISSING*")] <- "Typ" # may not be correct
+
 dat.all <- mutate(dat.all, SF2ndFlr = `2ndFlrSF`, SF1stFlr = `1stFlrSF`, Porch3Ssn = `3SsnPorch`) %>%
   select(everything(), -`1stFlrSF`, -`2ndFlrSF`, -`3SsnPorch`)
-dat.all$MSSubClass[dat.all$MSSubClass == 150] <- 50
-dat.all$MSSubClass[dat.all$MSSubClass == 45] <- 50
 
 
-#preserving ordinal rankings as much as possible
+# drop outliers (using https://www.kaggle.com/mshih2/house-prices-advanced-regression-techniques/using-xgboost-for-feature-selection/notebook)
+# should check independently
+# outlier.ids <- c(30,462,523,632,968,970, 1298, 1324)
+# dat.all <- dat.all[-outlier.ids, ]
+
+
+# preserving ordinal rankings as much as possible
 dat.ord <- mutate(dat.all, 
-                  LotShape = as.numeric(factor(LotShape, levels = c("Reg", "IR1", "IR2", "IR3"), ordered = TRUE)),
                   Utilities = as.numeric(factor(Utilities, levels = c("AllPub", "NoSewr", "NoSeWa", "ELO", "*MISSING*"), ordered = TRUE)),
                   LandSlope = as.numeric(factor(LandSlope, levels = c("Gtl", "Mod", "Sev"), ordered = TRUE)),
                   OverallQual = as.numeric(factor(OverallQual, ordered = TRUE)),
@@ -53,15 +68,14 @@ dat.ord <- mutate(dat.all,
                   BsmtFinType1 = as.numeric(factor(BsmtFinType1, levels = c("GLQ", "ALQ", "BLQ", "Rec", "LwQ", "Unf", "*MISSING*"), ordered = TRUE)),
                   BsmtFinType2 = as.numeric(factor(BsmtFinType2, levels = c("GLQ", "ALQ", "BLQ", "Rec", "LwQ", "Unf", "*MISSING*"), ordered = TRUE)),
                   GarageCond = as.numeric(factor(GarageCond, levels = c("Ex", "Gd", "TA", "Fa", "Po", "*MISSING*"), ordered = TRUE)),
-                  HeatingQC = as.numeric(factor(HeatingQC, levels = c("Ex", "Gd", "TA", "Fa", "Po"), ordered = TRUE)),
-                  Electrical = as.numeric(factor(Electrical, levels = c("SBrkr", "FuseA", "FuseF", "FuseP", "Mix", "*MISSING*"), ordered = TRUE)), # may want to revisit (not sure if Mixed should be ranked last)
+                  HeatingQC = as.numeric(factor(HeatingQC, levels = c("Ex", "Gd", "TA", "Fa", "Po", "*MISSING*"), ordered = TRUE)),
                   KitchenQual = as.numeric(factor(KitchenQual, levels = c("Ex", "Gd", "TA", "Fa", "Po", "*MISSING*"), ordered = TRUE)),
                   Functional = as.numeric(factor(Functional, levels = c("Typ", "Min1", "Min2", "Mod", "Maj1", "Maj2", "Sev", "Sal", "*MISSING*"), ordered = TRUE)),
                   FireplaceQu = as.numeric(factor(FireplaceQu, levels = c("Ex", "Gd", "TA", "Fa", "Po", "*MISSING*"), ordered = TRUE)),
                   GarageQual = as.numeric(factor(GarageQual, levels = c("Ex", "Gd", "TA", "Fa", "Po", "*MISSING*"), ordered = TRUE)),
                   PavedDrive = as.numeric(factor(PavedDrive, levels = c("Y", "P", "N"), ordered = TRUE)),
-                  PoolQC = as.numeric(factor(PoolQC, levels = c("Ex", "Gd", "TA", "Fa", "*MISSING*"), ordered = TRUE)),
-                  Fence = as.numeric(factor(Fence, levels = c("GdPrv", "MnPrv", "GdWo", "MnWw", "*MISSING*"), ordered = TRUE)) #should revisit this for sure
+                  PoolQC = as.numeric(factor(PoolQC, levels = c("Ex", "Gd", "TA", "Fa", "*MISSING*"), ordered = TRUE))
+                  #FenceQual = as.numeric(factor(FenceQual, levels = c("Gd", "Po", "*MISSING*"), ordered = TRUE)) #should revisit this for sure
                   ) 
 
 # applying OHE as much as possible
@@ -70,15 +84,24 @@ dat.ohe <- mutate(dat.all,
                   OverallCond = as.numeric(factor(OverallCond, ordered = TRUE))
                   ) 
 
-# convert characters to factors
-data_types <- sapply(PREDICTOR_ATTR,function(x){class(raw.all[[x]])})
+# convert characters to factors (need to cleanup this part)
+data_types <- sapply(ALL_ATTR,function(x){class(dat.ord[[x]])})
 unique_data_types <- unique(data_types)
 
 DATA_ATTR_TYPES <- lapply(unique_data_types,function(x){ names(data_types[data_types == x])})
 names(DATA_ATTR_TYPES) <- unique_data_types
-char_attr <- intersect(PREDICTOR_ATTR,DATA_ATTR_TYPES$character)
+char_attr <- DATA_ATTR_TYPES$character
 for (x in char_attr){
   dat.ord[[x]] <- factor(dat.ord[[x]])
+}
+
+data_types <- sapply(ALL_ATTR,function(x){class(dat.ohe[[x]])})
+unique_data_types <- unique(data_types)
+
+DATA_ATTR_TYPES <- lapply(unique_data_types,function(x){ names(data_types[data_types == x])})
+names(DATA_ATTR_TYPES) <- unique_data_types
+char_attr <- DATA_ATTR_TYPES$character
+for (x in char_attr){
   dat.ohe[[x]] <- factor(dat.ohe[[x]])
 }
 
@@ -109,8 +132,8 @@ cv.folds <- createFolds(y.train, k=5)
 # MISC --------------------------------------------------------------------
 
 # check for predictors with missing data
-# for (i in 1:ncol(raw.all)) {
-#   na.frac <- sum(is.na(raw.all[,i]) == TRUE)/nrow(raw.all)
-#   colname <- colnames(raw.all)[i]
+# for (i in 1:ncol(dat.ord)) {
+#   na.frac <- sum(is.na(dat.ord[,i]) == TRUE)/nrow(dat.ord)
+#   colname <- colnames(dat.ord)[i]
 #   print(c(colname,na.frac))
 # }
