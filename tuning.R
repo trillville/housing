@@ -1,48 +1,44 @@
-# caret xgboost tuning parameters
-# note - current thought is that these should be the TUNING parameters,
-# a second set (to be stored in utils.R) will correspond to the final tuned
-# parameters to be used in model building.
-
-source("pre_process.R")
-
-CARET.TRAIN.PARMS <- list(method="xgbTree")   
-
-CARET.TUNE.GRID <-  expand.grid(nrounds=seq(600,1000, by = 200), 
-                                max_depth=c(5,10,15), 
-                                eta=c(0.01,0.03,0.05,0.1), 
-                                gamma=0.1, 
-                                colsample_bytree=c(0.5,1), 
-                                min_child_weight=c(1))
-
-MODEL.SPECIFIC.PARMS <- list(verbose=0) 
-
-CARET.TRAIN.CTRL <- trainControl(method="repeatedCV",
-                                 number = 5,
-                                 repeats = 2,
-                                 verboseIter=FALSE,
-                                 classProbs=FALSE)
-
-CARET.TRAIN.OTHER.PARMS <- list(trControl=CARET.TRAIN.CTRL,
-                                tuneGrid=CARET.TUNE.GRID,
-                                metric="RMSE")
-
-# tune xgboost hyperparameters using caret
-xgb.cv.results <- train(x = ord.train.s,
-                        y = y.train,
-                        tuneGrid = CARET.TUNE.GRID,
-                        trControl = CARET.TRAIN.CTRL,
-                        metric = "RMSE",
-                        method = "xgbTree")
-
-# tunexgboost hyperparameters using bayesian optimization (TODO)
+# tunexgboost hyperparameters using bayesian optimization
+tune.bayes <- FALSE
+if (tune.bays == TRUE) {
+  cv.folds.bayes <- KFold(getinfo(ord.train.xgb, 'label'), nfolds = 5, stratified = FALSE, seed = 0)
+  
+  bayes.opt <- BayesianOptimization(xgbCvBayes,
+                              bounds = list(max.depth = c(1L, 15L),
+                                            subsample = c(0.3, 0.9),
+                                            colsample_bytree = c(0.3, 0.9),
+                                            eta = c(0.01, 0.3),
+                                            min_child_weight = c(1L,15L),
+                                            nrounds = c(100L,1200L)),
+                              init_points = 10, n_iter = 30, acq = "ucb", 
+                              kappa = 2.576, eps = 0, verbose = TRUE)
+}
+# bayesian optimization suggests eta = .1, mad.depth = 15, subsample = .9, colsample_bytree = .8267
+# min_child_weight = 7 
 
 
+# grid search to optimize nrounds and eta
+tune.caret <- FALSE
+if (tune.caret == TRUE) {
+  caret.train <- train(x = ord.train.s, y = y.train,
+                       method = "xgbTree",
+                       metric = "RMSE",
+                       tuneGrid = XGB_CARET_TUNE_GRID,
+                       trControl = CARET_TRAIN_CTRL)
+}
+# caret suggests eta = 0.03, nrounds = 200
 
-xgb.folds.ord <- llply(cv.folds, trainOneFold, ord.train.s, y.train, Id.train)
-xgb.folds.ohe <- llply(cv.folds, trainOneFold, ohe.train.s, y.train, Id.train)
-
-cat("Average ORD CV rmse:",mean(do.call(c,lapply(xgb.folds.ord,function(x){x$score}))))
-cat("Average OHE CV rmse:",mean(do.call(c,lapply(xgb.folds.ohe,function(x){x$score}))))
+check.base.xgboost <- FALSE
+if (check.base.xgboost == TRUE) {
+  set.seed(13)
+  cv.folds.caret <- createFolds(y.train, k=5)
+  
+  xgb.folds.ord <- llply(cv.folds.caret, trainOneFold, ord.train.s, y.train, Id.train)
+  xgb.folds.ohe <- llply(cv.folds.caret, trainOneFold, ohe.train.s, y.train, Id.train)
+  
+  cat("Average ORD CV rmse:",mean(do.call(c,lapply(xgb.folds.ord,function(x){x$score}))))
+  cat("Average OHE CV rmse:",mean(do.call(c,lapply(xgb.folds.ohe,function(x){x$score}))))
+}
 
 
 # Basic Tuning - bagged XGBoost -------------------------------------------
@@ -50,7 +46,7 @@ cat("Average OHE CV rmse:",mean(do.call(c,lapply(xgb.folds.ohe,function(x){x$sco
 # Train the model
 
 set.seed(100)
-runs <- 10
+runs <- 100
 train.ind <- 1:length(y.train)
 train.length <- length(y.train)
 
@@ -63,29 +59,47 @@ for (n in 1:runs) {
   ohe.tmpX2 <- ohe.train.s[tmpS2,]
   tmpY2 <- y.train[tmpS2]
   
-  ord.rf1 <- randomForest(x = as.matrix(ord.tmpX2), y = tmpY2, replace=F, ntree=100, do.trace=F, mtry = 90)
-  ohe.rf1 <- randomForest(x = as.matrix(ohe.tmpX2), y = tmpY2, replace=F, ntree=100, do.trace=F, mtry = 90)
-  
   ord.tmpX1 <- ord.train.s[tmpS1,]
   ohe.tmpX1 <- ohe.train.s[tmpS1,]
   tmpY1 <- y.train[tmpS1]
   
+  # add models here
+  ord.rf1 <- randomForest(x = as.matrix(ord.tmpX2), y = tmpY2, replace=F, ntree=100, do.trace=F, mtry = 90)
+  ohe.rf1 <- randomForest(x = as.matrix(ohe.tmpX2), y = tmpY2, replace=F, ntree=100, do.trace=F, mtry = 90)
+ 
+  ord.xg1 <- do.call(xgboost,
+                     c(list(data = ord.tmpX2,
+                            label = tmpY2),
+                       XGB_PARS))
+  ohe.xg1 <- do.call(xgboost,
+                     c(list(data = ohe.tmpX2,
+                            label = tmpY2),
+                       XGB_PARS))
+  
+  # predict first model
   ord.tmpX2 <- predict(ord.rf1, as.matrix(ord.tmpX1), type="response")
   ord.tmpX3 <- predict(ord.rf1, as.matrix(ord.test.s), type="response")
   ohe.tmpX2 <- predict(ohe.rf1, as.matrix(ohe.tmpX1), type="response")
   ohe.tmpX3 <- predict(ohe.rf1, as.matrix(ohe.test.s), type="response")
   
+  # aggregate model predictions
+  ord.tmpX2 <- cbind(ord.tmpX2,predict(ord.xg1, as.matrix(ord.tmpX1)))
+  ord.tmpX3 <- cbind(ord.tmpX3,predict(ord.xg1, as.matrix(ord.test.s)))
+  ohe.tmpX2 <- cbind(ohe.tmpX2,predict(ohe.xg1, as.matrix(ohe.tmpX1)))
+  ohe.tmpX3 <- cbind(ohe.tmpX3,predict(ohe.xg1, as.matrix(ohe.test.s)))
+  
+  # run xgboost on stacked predictions
   ord.bst <- do.call(xgboost,
-                 c(list(data = cbind(ord.tmpX1,ord.tmpX2),
-                        label = tmpY1),
-                   XGB_PARS))
+                     c(list(data = cbind(ord.tmpX1,ord.tmpX2),
+                            label = tmpY1),
+                       XGB_PARS))
   
   ohe.bst <- do.call(xgboost,
-                 c(list(data = cbind(ohe.tmpX1,ohe.tmpX2),
-                        label = tmpY1),
-                   XGB_PARS))
+                     c(list(data = cbind(ohe.tmpX1,ohe.tmpX2),
+                            label = tmpY1),
+                       XGB_PARS))
   
-  # Make prediction
+  # predict test set
   ord.pred0 = predict(ord.bst,cbind(ord.test.s, ord.tmpX3))
   ohe.pred0 = predict(ohe.bst,cbind(ohe.test.s, ohe.tmpX3))
   if (n == 1) {
@@ -99,11 +113,9 @@ for (n in 1:runs) {
 pred.agg <- ord.pred + ohe.pred
 pred.avg = pred.agg/(2*runs)
 pred.mat <- cbind(Id.test, pred.avg)
-write.csv(pred.mat, file = "sub1.csv")
+colnames(pred.mat) <- c("Id", "SalePrice")
+write.csv(pred.mat, file = "sub1.csv", row.names = FALSE)
 
-# TODO
-# 1) fun exercise - see if avg of two models has any boost in performance
-# 2) clean up encoding (esp in ordinal case)
-# 3) independent feature analysis (check out Boruta) oR TSNE
-# 4) improve upon 'accuracy' metric - seems like it is not very stable right now. Maybe use ensemble leaderboard performance?
-# 5) start on model ensembling
+pred.mat2 <- cbind(Id.test, ord.pred/runs)
+colnames(pred.mat2) <- c("Id", "SalePrice")
+write.csv(pred.mat2, file = "sub2.csv", row.names = FALSE)

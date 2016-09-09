@@ -1,8 +1,5 @@
 # Load Data ---------------------------------------------------------------
 
-# load libraries and functions needed
-source("utils.R")
-
 raw.train <- read_csv("train.csv")
 raw.test <- read_csv("test.csv")
 raw.all <- bind_rows(raw.train, raw.test)
@@ -47,12 +44,10 @@ dat.all$Functional[which(dat.all$Functional =="*MISSING*")] <- "Typ" # may not b
 dat.all <- mutate(dat.all, SF2ndFlr = `2ndFlrSF`, SF1stFlr = `1stFlrSF`, Porch3Ssn = `3SsnPorch`) %>%
   select(everything(), -`1stFlrSF`, -`2ndFlrSF`, -`3SsnPorch`)
 
-
 # drop outliers (using https://www.kaggle.com/mshih2/house-prices-advanced-regression-techniques/using-xgboost-for-feature-selection/notebook)
 # should check independently
 # outlier.ids <- c(30,462,523,632,968,970, 1298, 1324)
 # dat.all <- dat.all[-outlier.ids, ]
-
 
 # preserving ordinal rankings as much as possible
 dat.ord <- mutate(dat.all, 
@@ -76,13 +71,13 @@ dat.ord <- mutate(dat.all,
                   PavedDrive = as.numeric(factor(PavedDrive, levels = c("Y", "P", "N"), ordered = TRUE)),
                   PoolQC = as.numeric(factor(PoolQC, levels = c("Ex", "Gd", "TA", "Fa", "*MISSING*"), ordered = TRUE))
                   #FenceQual = as.numeric(factor(FenceQual, levels = c("Gd", "Po", "*MISSING*"), ordered = TRUE)) #should revisit this for sure
-                  ) 
+) 
 
 # applying OHE as much as possible
 dat.ohe <- mutate(dat.all, 
                   OverallQual = as.numeric(factor(OverallQual, ordered = TRUE)),
                   OverallCond = as.numeric(factor(OverallCond, ordered = TRUE))
-                  ) 
+) 
 
 # convert characters to factors (need to cleanup this part)
 data_types <- sapply(ALL_ATTR,function(x){class(dat.ord[[x]])})
@@ -113,22 +108,32 @@ y.train <- dat.all$SalePrice[train]
 Id.train <- dat.all$Id[train]
 Id.test <- dat.all$Id[test]
 
-# workaround to get sparse.model.matrix to work with NAs - REVIST
-previous_na_action <- options('na.action')
-options(na.action='na.pass')
+dat.ord <- dat.ord[, PREDICTOR_ATTR]
+dat.ohe <- dat.ohe[, PREDICTOR_ATTR]
 
-ord.train.s <- sparse.model.matrix(SalePrice ~ . -1 -Id, data = dat.ord[train, ]) 
-ord.test.s <- sparse.model.matrix(~ . -1 -Id -SalePrice, data = dat.ord[test, ]) 
+# workaround to get sparse.model.matrix to work with NAs - FIXED
+#previous_na_action <- options('na.action')
+#options(na.action='na.pass')
 
-ohe.train.s <- sparse.model.matrix(SalePrice ~ . -1 -Id, data = dat.ohe[train, ]) 
-ohe.test.s <- sparse.model.matrix(~ . -1 -Id -SalePrice, data = dat.ohe[test, ]) 
+ord.train.s <- sparse.model.matrix(~ . -1, data = dat.ord[train, ])
+ord.train.xgb <- xgb.DMatrix(data = ord.train.s, label = y.train)
+ord.test.s <- sparse.model.matrix(~ . -1, data = dat.ord[test, ]) 
+ord.test.xgb <- xgb.DMatrix(data = ord.train.s)
 
-options(na.action=previous_na_action$na.action)
+ohe.train.s <- sparse.model.matrix(~ . -1, data = dat.ohe[train, ])
+ohe.train.xgb <- xgb.DMatrix(data = ohe.train.s, label = y.train)
+ohe.test.s <- sparse.model.matrix(~ . -1, data = dat.ohe[test, ]) 
+ohe.test.xgb <- xgb.DMatrix(data = ohe.train.s)
 
-set.seed(13)
-cv.folds <- createFolds(y.train, k=5)
+
+# TSNE --------------------------------------------------------------------
+
+tsne <- Rtsne(as.matrix(dat.ord), check_duplicates = FALSE, pca = FALSE, 
+              perplexity=25, theta=0.5, dims=2)
 
 
+
+#options(na.action=previous_na_action$na.action)
 # MISC --------------------------------------------------------------------
 
 # check for predictors with missing data
