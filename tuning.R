@@ -1,3 +1,6 @@
+
+# XGBoost Tuning ----------------------------------------------------------
+
 # tunexgboost hyperparameters using bayesian optimization
 tune.bayes <- FALSE
 if (tune.bays == TRUE) {
@@ -10,8 +13,8 @@ if (tune.bays == TRUE) {
                                             eta = c(0.01, 0.1),
                                             min_child_weight = c(1L,15L),
                                             nrounds = c(500L,1200L)),
-                              init_points = 15, n_iter = 30, acq = "ucb", 
-                              kappa = 2.576, eps = 0, verbose = TRUE)
+                              init_points = 15, n_iter = 30, acq = "ei", 
+                              kappa = 3, eps = 0.5, verbose = TRUE)
 }
 # bayesian optimization suggests eta = .1, mad.depth = 15, subsample = .9, colsample_bytree = .8267
 # min_child_weight = 7 
@@ -31,7 +34,9 @@ if (tune.caret == TRUE) {
 check.base.xgboost <- FALSE
 if (check.base.xgboost == TRUE) {
   set.seed(13)
-  cv.folds.caret <- createFolds(y.train, k=5)
+  #cv.folds.caret <- createFolds(y.train, k=5)
+  cv.folds.caret <- createMultiFolds(y.train, k = 5, times = 5)
+  
   
   xgb.folds.ord <- llply(cv.folds.caret, trainOneFold, ord.train.s, y.train, Id.train)
   xgb.folds.ohe <- llply(cv.folds.caret, trainOneFold, ohe.train.s, y.train, Id.train)
@@ -41,9 +46,13 @@ if (check.base.xgboost == TRUE) {
 }
 
 
-# Basic Tuning - bagged XGBoost -------------------------------------------
+# Nnet Tuning -------------------------------------------------------------
+ord.train.nn <- cbind(ord.train.nn, y.train)
+f <- as.formula(paste("medv ~", paste(n[!n %in% "medv"], collapse = " + ")))
+nn <- neuralnet(f,data=train_,hidden=c(5,3),linear.output=T)
 
-# Train the model
+
+# Ensemble Tuning -------------------------------------------
 
 set.seed(100)
 runs <- 100

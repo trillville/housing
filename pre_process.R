@@ -117,9 +117,14 @@ dat.ohe <- dat.ohe[, PREDICTOR_ATTR]
 ord.all <- sparse.model.matrix(~ . -1, data = dat.ord)
 ohe.all <-sparse.model.matrix(~ . -1, data = dat.ohe) 
 
+ord.train.s <- ord.all[train, ]
+ord.test.s <- ord.all[test, ]
+ohe.train.s <- ohe.all[train, ]
+ohe.test.s <- ohe.all[test, ]
+
 # TSNE --------------------------------------------------------------------
 
-use.tsne <- TRUE
+use.tsne <- FALSE # makes model worse apparently
 if (use.tsne == TRUE) {
   tsne <- Rtsne(as.matrix(ohe.all), check_duplicates = FALSE, pca = FALSE, 
                 perplexity=25, theta=0.1, dims=2)
@@ -129,10 +134,10 @@ if (use.tsne == TRUE) {
   
   colnames(tsne$Y) <- c("TSNE1", "TSNE2")
   # need to determine whether or not it makes sense to do TSNE for both OHE and ORD encodings
-  ord.train.s <- cbind(ord.all[train, ], tsne$Y[train, ])
-  ord.test.s <- cbind(ord.all[test, ], tsne$Y[test, ])
-  ohe.train.s <- cbind(ohe.all[train, ], tsne$Y[train, ])
-  ohe.test.s <- cbind(ohe.all[test, ], tsne$Y[test, ])
+  ord.train.s <- cbind(ord.train.s, tsne$Y[train, ])
+  ord.test.s <- cbind(ord.test.s, tsne$Y[test, ])
+  ohe.train.s <- cbind(ohe.train.s, tsne$Y[train, ])
+  ohe.test.s <- cbind(ohe.test.s, tsne$Y[test, ])
 }
 
 # Pointers to xgb matrices
@@ -141,6 +146,12 @@ ord.test.xgb <- xgb.DMatrix(data = ord.train.s)
 
 ohe.train.xgb <- xgb.DMatrix(data = ohe.train.s, label = y.train)
 ohe.test.xgb <- xgb.DMatrix(data = ohe.train.s)
+
+# NNET preprocessing
+pp <- preProcess(dat.ord, method = c("center", "scale", "spatialSign"))
+ord.all.nn <- predict(pp, dat.ord)
+ord.train.nn <- ord.all.nn[train, ]
+ord.test.nn <- ord.all.nn[test, ]
 
 #options(na.action=previous_na_action$na.action)
 # MISC --------------------------------------------------------------------

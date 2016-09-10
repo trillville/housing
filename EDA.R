@@ -59,7 +59,6 @@ boruta.ord.rejected <- as.character(final$names[which(final$V2 == 3)])
 # OHE encoding
 
 
-
 # Looking at/handling related variables -----------------------------------
 
 names <- colnames(dat.all)

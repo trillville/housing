@@ -25,20 +25,34 @@ trainOneFold <- function(fold, predictors, y, ID) {
   # fit model based on all training data except for current fold
   set.seed(825)
   fit <- do.call(xgboost,
-                 c(list(data = predictors[-fold, ],
-                        label = y[-fold]),
+                 c(list(data = predictors[fold, ],
+                        label = y[fold]),
                    XGB_PARS))
   
-  pred <- predict(fit,newdata = predictors[fold, ])
+  pred <- predict(fit,newdata = predictors[-fold, ])
   
-  score <- logRMSE(y[fold], pred)
+  score <- logRMSE(y[-fold], pred)
   
   ans <- list(fitted.mdl = fit,
               score=score,
-              predictions = data.frame(ID = ID[fold], yhat = pred, y = y[fold]))
+              predictions = data.frame(ID = ID[-fold], yhat = pred, y = y[-fold]))
   
   return(ans)
 }
+
+getCVPerformance <- function(model.parameters, predictors, y, ID) {
+  cv.folds.caret <- createMultiFolds(y, k = 5, times = 5)
+  fit <- do.call(model.parameters)
+  
+  
+}
+
+for (i in 1:length(xgb.folds.ord)) {
+  set.seed(69)
+  folds <- createMultiFolds()
+}
+
+
 
 xgbCvBayes <- function(max.depth, subsample, colsample_bytree, eta, min_child_weight, nrounds) {
   cv <- xgb.cv(params = list(max.depth = max.depth,
@@ -63,7 +77,7 @@ logRMSE <- function(actual, predicted) {
 
 runBoruta <- function(){
   
-  # ordinal encoding
+  # using ordinal encoding
   response <- y.train
   sample <- select(dat.ord, everything(), -Id, -SalePrice)
   set.seed(69)
