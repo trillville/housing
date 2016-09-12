@@ -2,17 +2,17 @@
 
 # compare feature importance between OHE and ORD schemes
 xgb.full.ord <- do.call(xgboost,
-                        c(list(data = ord.train.s,
+                        c(list(data = ord.train.m,
                                label = y.train),
                           XGB_PARS))
 
 xgb.full.ohe <- do.call(xgboost,
-                        c(list(data = ohe.train.s,
+                        c(list(data = ohe.train.m,
                                label = y.train),
                           XGB_PARS))
 
-feature.names.ord <- dimnames(ord.train.s)[[2]]
-feature.names.ohe <- dimnames(ohe.train.s)[[2]]
+feature.names.ord <- dimnames(ord.train.m)[[2]]
+feature.names.ohe <- dimnames(ohe.train.m)[[2]]
 
 importance.ord <- xgb.importance(feature.names.ord, model = xgb.full.ord)
 importance.ohe <- xgb.importance(feature.names.ohe, model = xgb.full.ohe)

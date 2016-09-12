@@ -1,57 +1,36 @@
-# Libraries ---------------------------------------------------------------
-
-#library(FeatureHashing)
-library(Matrix)
-library(xgboost)
-library(randomForest)
-library(rBayesianOptimization)
-library(caret)
-library(Rtsne)
-library(plyr)
-library(dplyr)
-library(ggplot2)
-library(stringr)
-#library(dummies)
-library(Metrics)
-library(readr)
-
-library(Boruta)
-#library(kernlab)
-#library(data.table)
-
 # Functions ---------------------------------------------------------------
 
-trainOneFold <- function(fold, predictors, y, ID) {
-  # fit model based on all training data except for current fold
-  set.seed(825)
-  fit <- do.call(xgboost,
-                 c(list(data = predictors[fold, ],
-                        label = y[fold]),
-                   XGB_PARS))
-  
-  pred <- predict(fit,newdata = predictors[-fold, ])
-  
-  score <- logRMSE(y[-fold], pred)
-  
-  ans <- list(fitted.mdl = fit,
-              score=score,
-              predictions = data.frame(ID = ID[-fold], yhat = pred, y = y[-fold]))
-  
-  return(ans)
+xgbCVPerformance <- function(model.parameters, predictors, y) {
+  set.seed(100)
+  results <- c(length = length(cv.folds.caret))
+  for (i in 1:length(cv.folds.caret)) {
+    fold <- cv.folds.caret[[i]]
+    fit <- do.call(xgboost, 
+                   c(list(data = predictors[fold, ],
+                     label = y[fold]),
+                     model.parameters))
+    pred <- predict(fit, newdata = predictors[-fold, ])
+    score <- logRMSE(y[-fold], pred)
+    results[i] <- score
+  }
+  return(results)
 }
 
-getCVPerformance <- function(model.parameters, predictors, y, ID) {
-  cv.folds.caret <- createMultiFolds(y, k = 5, times = 5)
-  fit <- do.call(model.parameters)
-  
-  
+rfCVPerformance <- function(model.parameters, predictors, y) {
+  set.seed(100)
+  results <- c(length = length(cv.folds.caret))
+  for (i in 1:length(cv.folds.caret)) {
+    fold <- cv.folds.caret[[i]]
+    fit <- do.call(randomForest, 
+                   c(list(x = predictors[fold, ],
+                          y = y[fold]),
+                     model.parameters))
+    pred <- predict(fit, newdata = predictors[-fold, ])
+    score <- logRMSE(y[-fold], pred)
+    results[i] <- score
+  }
+  return(results)
 }
-
-for (i in 1:length(xgb.folds.ord)) {
-  set.seed(69)
-  folds <- createMultiFolds()
-}
-
 
 
 xgbCvBayes <- function(max.depth, subsample, colsample_bytree, eta, min_child_weight, nrounds) {
@@ -76,25 +55,24 @@ logRMSE <- function(actual, predicted) {
 }
 
 runBoruta <- function(){
-  
   # using ordinal encoding
   response <- y.train
-  sample <- select(dat.ord, everything(), -Id, -SalePrice)
   set.seed(69)
-  bor.results <- Boruta(sample[train, ], 
+  bor.results <- Boruta(ord.train.m,
                         response,
                         maxRuns = 200,
                         doTrace = 2)
   
   results <- as.data.frame(bor.results$finalDecision)
-  names <- rownames(test)
+  names <- rownames(results)
   final <- data.frame(cbind(names, results[[1]]))
+  final[[1]] <- as.character(final[[1]])
   
-  boruta.ord.tentative <- as.character(final$names[which(final$V2 == 1)])
-  boruta.ord.confirmed <- as.character(final$names[which(final$V2 == 2)])
-  boruta.ord.rejected <- as.character(final$names[which(final$V2 == 3)])
+  boruta.tentative <- final$X1[which(final$X2 == 1)]
+  boruta.confirmed <- final$X1[which(final$X2 == 2)]
+  boruta.rejected <- final$X1[which(final$X2 == 3)]
   ans <- list(bor.results,
-              boruta.ord,tentative,
+              boruta.tentative,
               boruta.confirmed,
               boruta.rejected)
   return(ans)

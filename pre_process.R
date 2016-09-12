@@ -11,7 +11,7 @@ raw.all <- bind_rows(raw.train, raw.test)
 # numeric = -1
 dat.all <- raw.all
 
-data_types <- sapply(ALL_ATTR,function(x){class(dat.all[[x]])})
+data_types <- sapply(colnames(raw.all),function(x){class(dat.all[[x]])})
 unique_data_types <- unique(data_types)
 
 DATA_ATTR_TYPES <- lapply(unique_data_types,function(x){ names(data_types[data_types == x])})
@@ -49,7 +49,8 @@ dat.all <- mutate(dat.all, SF2ndFlr = `2ndFlrSF`, SF1stFlr = `1stFlrSF`, Porch3S
 # dat.all <- dat.all[-outlier.ids, ]
 
 # preserving ordinal rankings as much as possible
-dat.ord <- mutate(dat.all, 
+dat.ord <- mutate(dat.all,
+                  MSSubClass = as.factor(MSSubClass),
                   Utilities = as.numeric(factor(Utilities, levels = c("AllPub", "NoSewr", "NoSeWa", "ELO", "*MISSING*"), ordered = TRUE)),
                   LandSlope = as.numeric(factor(LandSlope, levels = c("Gtl", "Mod", "Sev"), ordered = TRUE)),
                   OverallQual = as.numeric(factor(OverallQual, ordered = TRUE)),
@@ -72,14 +73,14 @@ dat.ord <- mutate(dat.all,
                   #FenceQual = as.numeric(factor(FenceQual, levels = c("Gd", "Po", "*MISSING*"), ordered = TRUE)) #should revisit this for sure
 ) 
 
-# applying OHE as much as possible
+# applying OHE as much as possible (doesn't appear to be helpful - dropping for now)
 dat.ohe <- mutate(dat.all, 
                   OverallQual = as.numeric(factor(OverallQual, ordered = TRUE)),
                   OverallCond = as.numeric(factor(OverallCond, ordered = TRUE))
 ) 
 
 # convert characters to factors (need to cleanup this part)
-data_types <- sapply(ALL_ATTR,function(x){class(dat.ord[[x]])})
+data_types <- sapply(colnames(dat.ord),function(x){class(dat.ord[[x]])})
 unique_data_types <- unique(data_types)
 
 DATA_ATTR_TYPES <- lapply(unique_data_types,function(x){ names(data_types[data_types == x])})
@@ -89,7 +90,7 @@ for (x in char_attr){
   dat.ord[[x]] <- factor(dat.ord[[x]])
 }
 
-data_types <- sapply(ALL_ATTR,function(x){class(dat.ohe[[x]])})
+data_types <- sapply(colnames(dat.ohe),function(x){class(dat.ohe[[x]])})
 unique_data_types <- unique(data_types)
 
 DATA_ATTR_TYPES <- lapply(unique_data_types,function(x){ names(data_types[data_types == x])})
@@ -100,27 +101,25 @@ for (x in char_attr){
 }
 
 # Prepare data for models -------------------------------------------------
-test <- which(is.na(dat.all$SalePrice))
+test <- which(dat.all$SalePrice == -1)
 train <- setdiff(1:nrow(dat.all), test)
 
 y.train <- dat.all$SalePrice[train]
 Id.train <- dat.all$Id[train]
 Id.test <- dat.all$Id[test]
 
-dat.ord <- dat.ord[, PREDICTOR_ATTR]
-dat.ohe <- dat.ohe[, PREDICTOR_ATTR]
+dat.ord <- select(dat.ord, -Id, -SalePrice)
+dat.ohe <- select(dat.ohe, -Id, -SalePrice)
 
-# workaround to get sparse.model.matrix to work with NAs - FIXED
-#previous_na_action <- options('na.action')
-#options(na.action='na.pass')
+ord.dummies <- dummyVars(~ ., dat.ord)
+ohe.dummies <- dummyVars(~ ., dat.ohe)
+ord.m <- predict(ord.dummies, dat.ord)
+ohe.m <- predict(ohe.dummies, dat.ohe)
 
-ord.all <- sparse.model.matrix(~ . -1, data = dat.ord)
-ohe.all <-sparse.model.matrix(~ . -1, data = dat.ohe) 
-
-ord.train.s <- ord.all[train, ]
-ord.test.s <- ord.all[test, ]
-ohe.train.s <- ohe.all[train, ]
-ohe.test.s <- ohe.all[test, ]
+ord.train.m <- ord.m[train, ]
+ord.test.m <- ord.m[test, ]
+ohe.train.m <- ohe.m[train, ]
+ohe.test.m <- ohe.m[test, ]
 
 # TSNE --------------------------------------------------------------------
 
@@ -134,24 +133,26 @@ if (use.tsne == TRUE) {
   
   colnames(tsne$Y) <- c("TSNE1", "TSNE2")
   # need to determine whether or not it makes sense to do TSNE for both OHE and ORD encodings
-  ord.train.s <- cbind(ord.train.s, tsne$Y[train, ])
-  ord.test.s <- cbind(ord.test.s, tsne$Y[test, ])
-  ohe.train.s <- cbind(ohe.train.s, tsne$Y[train, ])
-  ohe.test.s <- cbind(ohe.test.s, tsne$Y[test, ])
+  ord.train.m <- cbind(ord.train.m, tsne$Y[train, ])
+  ord.test.m <- cbind(ord.test.m, tsne$Y[test, ])
+  ohe.train.m <- cbind(ohe.train.m, tsne$Y[train, ])
+  ohe.test.m <- cbind(ohe.test.m, tsne$Y[test, ])
 }
 
+
+# Center, scale, and drop outliers
+pp <- preProcess(ord.m, method = c("center", "scale"), na.remove = FALSE)
+ord.m.pp <- predict(pp, as.matrix(ord.m))
+ord.train.pp <- ord.m.pp[train, ]
+ord.test.pp <- ord.m.pp[test, ]
+
+
 # Pointers to xgb matrices
-ord.train.xgb <- xgb.DMatrix(data = ord.train.s, label = y.train)
-ord.test.xgb <- xgb.DMatrix(data = ord.train.s)
+ord.train.xgb <- xgb.DMatrix(data = ord.train.m, label = y.train)
+ord.test.xgb <- xgb.DMatrix(data = ord.train.m)
 
-ohe.train.xgb <- xgb.DMatrix(data = ohe.train.s, label = y.train)
-ohe.test.xgb <- xgb.DMatrix(data = ohe.train.s)
-
-# NNET preprocessing
-pp <- preProcess(dat.ord, method = c("center", "scale", "spatialSign"))
-ord.all.nn <- predict(pp, dat.ord)
-ord.train.nn <- ord.all.nn[train, ]
-ord.test.nn <- ord.all.nn[test, ]
+ohe.train.xgb <- xgb.DMatrix(data = ohe.train.m, label = y.train)
+ohe.test.xgb <- xgb.DMatrix(data = ohe.train.m)
 
 #options(na.action=previous_na_action$na.action)
 # MISC --------------------------------------------------------------------
