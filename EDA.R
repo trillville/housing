@@ -2,17 +2,17 @@
 
 # compare feature importance between OHE and ORD schemes
 xgb.full.ord <- do.call(xgboost,
-                        c(list(data = ord.train.m,
+                        c(list(data = ord.train.s,
                                label = y.train),
                           XGB_PARS))
 
 xgb.full.ohe <- do.call(xgboost,
-                        c(list(data = ohe.train.m,
+                        c(list(data = ohe.train.s,
                                label = y.train),
                           XGB_PARS))
 
-feature.names.ord <- dimnames(ord.train.m)[[2]]
-feature.names.ohe <- dimnames(ohe.train.m)[[2]]
+feature.names.ord <- dimnames(ord.train.s)[[2]]
+feature.names.ohe <- dimnames(ohe.train.s)[[2]]
 
 importance.ord <- xgb.importance(feature.names.ord, model = xgb.full.ord)
 importance.ohe <- xgb.importance(feature.names.ohe, model = xgb.full.ohe)
@@ -27,6 +27,8 @@ library(corrplot)
 # cor.vars <- as.matrix(mat.train[,colnames(mat.train) %in% important.vars])
 # cors <- cor(cor.vars, cor.vars)
 # corrplot(cors, method="circle", type="lower",  sig.level = 0.01, insig = "blank")
+
+cors <- data
 
 # graphs of data/predictor relationships
 library(car)
@@ -57,6 +59,7 @@ boruta.ord.confirmed <- as.character(final$names[which(final$V2 == 2)])
 boruta.ord.rejected <- as.character(final$names[which(final$V2 == 3)])
 
 # OHE encoding
+
 
 
 # Looking at/handling related variables -----------------------------------

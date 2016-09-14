@@ -7,10 +7,10 @@ xgbCVPerformance <- function(model.parameters, predictors, y) {
     fold <- cv.folds.caret[[i]]
     fit <- do.call(xgboost, 
                    c(list(data = predictors[fold, ],
-                     label = y[fold]),
+                          label = y[fold]),
                      model.parameters))
     pred <- predict(fit, newdata = predictors[-fold, ])
-    score <- logRMSE(y[-fold], pred)
+    score <- rmse(y[-fold], pred)
     results[i] <- score
   }
   return(results)
@@ -26,7 +26,7 @@ rfCVPerformance <- function(model.parameters, predictors, y) {
                           y = y[fold]),
                      model.parameters))
     pred <- predict(fit, newdata = predictors[-fold, ])
-    score <- logRMSE(y[-fold], pred)
+    score <- rmse(y[-fold], pred)
     results[i] <- score
   }
   return(results)
@@ -60,7 +60,7 @@ runBoruta <- function(){
   set.seed(69)
   bor.results <- Boruta(ord.train.m,
                         response,
-                        maxRuns = 200,
+                        maxRuns = 400,
                         doTrace = 2)
   
   results <- as.data.frame(bor.results$finalDecision)
@@ -68,9 +68,9 @@ runBoruta <- function(){
   final <- data.frame(cbind(names, results[[1]]))
   final[[1]] <- as.character(final[[1]])
   
-  boruta.tentative <- final$X1[which(final$X2 == 1)]
-  boruta.confirmed <- final$X1[which(final$X2 == 2)]
-  boruta.rejected <- final$X1[which(final$X2 == 3)]
+  boruta.tentative <- final$names[which(final$V2 == 1)]
+  boruta.confirmed <- final$names[which(final$V2 == 2)]
+  boruta.rejected <- final$names[which(final$V2 == 3)]
   ans <- list(bor.results,
               boruta.tentative,
               boruta.confirmed,

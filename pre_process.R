@@ -5,11 +5,11 @@ raw.all <- bind_rows(raw.train, raw.test)
 
 # Data Cleaning -----------------------------------------------------------
 
-
-# Replacing missing values (courtesy of JMT5802)
-# characters = *MISSING* 
-# numeric = -1
 dat.all <- raw.all
+
+dat.all$MSSubClass <- as.character(dat.all$MSSubClass)
+date <- dat.all$YrSold + (dat.all$MoSold - 1)/12
+dat.all$YrSold <- date
 
 data_types <- sapply(colnames(raw.all),function(x){class(dat.all[[x]])})
 unique_data_types <- unique(data_types)
@@ -17,20 +17,25 @@ unique_data_types <- unique(data_types)
 DATA_ATTR_TYPES <- lapply(unique_data_types,function(x){ names(data_types[data_types == x])})
 names(DATA_ATTR_TYPES) <- unique_data_types
 
-num_attr <- DATA_ATTR_TYPES$integer
-for (x in num_attr){
-  dat.all[[x]][is.na(dat.all[[x]])] <- -1
-}
+num.attr <- DATA_ATTR_TYPES$integer
 
-char_attr <- DATA_ATTR_TYPES$character
-for (x in char_attr){
-  dat.all[[x]][is.na(dat.all[[x]])] <- "*MISSING*"
-  #dat.all[[x]] <- factor(dat.all[[x]])
-}
+# preprocess numeric variables
+raw.num <- raw.all[, num.attr]
+# col 1 = ID, col 37 = Saleprice (convert this to a simple log)
+pp <- preProcess(raw.num[, -c(1,37)], method = c("center", "scale"), na.action = na.pass)
+pp.num <- predict(pp, newdata = raw.num)
+pp.num$SalePrice <- log(pp.num$SalePrice)
+pp.num[is.na(pp.num)] <- -1
+
+
+char.attr <- DATA_ATTR_TYPES$character
+raw.char <- raw.all[, char.attr]
+raw.char[is.na(raw.char)] <- "*MISSING*"
+dat.all <- cbind(pp.num, raw.char)
 
 # data modifications based on EDA
-dat.all$MSSubClass[which(dat.all$MSSubClass == 150)] <- 50
-dat.all$MSSubClass[which(dat.all$MSSubClass == 45)] <- 50
+dat.all$MSSubClass[which(dat.all$MSSubClass == "150")] <- "50"
+dat.all$MSSubClass[which(dat.all$MSSubClass == "45")] <- "50"
 dat.all$Condition2[which(dat.all$Condition1 == dat.all$Condition2)] <- "Norm"
 dat.all$KitchenQual[which(dat.all$KitchenQual == "*MISSING*")] <- "TA" # only one house, based on overallqual looks like TA most likely value
 dat.all$GarageCars[which(dat.all$GarageCars == -1)] <- 0 
@@ -73,11 +78,6 @@ dat.ord <- mutate(dat.all,
                   #FenceQual = as.numeric(factor(FenceQual, levels = c("Gd", "Po", "*MISSING*"), ordered = TRUE)) #should revisit this for sure
 ) 
 
-# applying OHE as much as possible (doesn't appear to be helpful - dropping for now)
-dat.ohe <- mutate(dat.all, 
-                  OverallQual = as.numeric(factor(OverallQual, ordered = TRUE)),
-                  OverallCond = as.numeric(factor(OverallCond, ordered = TRUE))
-) 
 
 # convert characters to factors (need to cleanup this part)
 data_types <- sapply(colnames(dat.ord),function(x){class(dat.ord[[x]])})
@@ -90,15 +90,21 @@ for (x in char_attr){
   dat.ord[[x]] <- factor(dat.ord[[x]])
 }
 
-data_types <- sapply(colnames(dat.ohe),function(x){class(dat.ohe[[x]])})
-unique_data_types <- unique(data_types)
+#impute missing values for LotFrontage
+frontage.vars = c('LotArea','LotShape','LandContour','LandSlope','LotConfig','LotFrontage', 'Street', 
+                  'Alley', 'PavedDrive')
+tmp <- dat.ord[, frontage.vars]
+tmp.test <- which(tmp$LotFrontage == -1)
+tmp.train <- setdiff(1:nrow(dat.ord), tmp.test)
+tmp.y <- dat.ord$LotFrontage
+tmp.dummies <- dummyVars(LotFrontage~ ., tmp)
+tmp.m <- predict(tmp.dummies, tmp)
 
-DATA_ATTR_TYPES <- lapply(unique_data_types,function(x){ names(data_types[data_types == x])})
-names(DATA_ATTR_TYPES) <- unique_data_types
-char_attr <- DATA_ATTR_TYPES$character
-for (x in char_attr){
-  dat.ohe[[x]] <- factor(dat.ohe[[x]])
-}
+tmp.xgb <- xgboost(data = tmp.m[tmp.train, ], label = tmp.y[tmp.train],
+                   objective = "reg:linear", eval_metric = "rmse", 
+                   nrounds = 50, max_depth = 4, eta = 0.3, gamma = 0,
+                   colsample_bytree = 0.8, min_child_weight = 1)
+dat.ord$LotFrontage[tmp.test] <- predict(tmp.xgb, newdata = tmp.m[tmp.test, ])
 
 # Prepare data for models -------------------------------------------------
 test <- which(dat.all$SalePrice == -1)
@@ -109,50 +115,36 @@ Id.train <- dat.all$Id[train]
 Id.test <- dat.all$Id[test]
 
 dat.ord <- select(dat.ord, -Id, -SalePrice)
-dat.ohe <- select(dat.ohe, -Id, -SalePrice)
 
 ord.dummies <- dummyVars(~ ., dat.ord)
-ohe.dummies <- dummyVars(~ ., dat.ohe)
 ord.m <- predict(ord.dummies, dat.ord)
-ohe.m <- predict(ohe.dummies, dat.ohe)
+ord.b.m <- as.matrix(data.frame(ord.m)[, PREDICTOR_ATTR])
 
 ord.train.m <- ord.m[train, ]
 ord.test.m <- ord.m[test, ]
-ohe.train.m <- ohe.m[train, ]
-ohe.test.m <- ohe.m[test, ]
+ord.train.b.m <- ord.b.m[train, ]
+ord.test.b.m <- ord.b.m[test, ]
 
 # TSNE --------------------------------------------------------------------
 
 use.tsne <- FALSE # makes model worse apparently
 if (use.tsne == TRUE) {
-  tsne <- Rtsne(as.matrix(ohe.all), check_duplicates = FALSE, pca = FALSE, 
+  tsne <- Rtsne(ord.m, check_duplicates = FALSE, pca = FALSE, 
                 perplexity=25, theta=0.1, dims=2)
-  tsne.df <- data.frame(cbind(tsne$Y[train,], y.train/1000))
-  qplot(tsne.df$X1, tsne.df$X2, data = tsne.df, color = tsne.df$X3) +
+  tsne.df <- data.frame(cbind(tsne$Y[train,], y.train))
+  qplot(tsne.df$TSNE1, tsne.df$TSNE2, data = tsne.df, color = tsne.df$y.train) +
     scale_colour_gradient(limits=c(34.90, 350))#,low="red",high="white")
   
   colnames(tsne$Y) <- c("TSNE1", "TSNE2")
   # need to determine whether or not it makes sense to do TSNE for both OHE and ORD encodings
-  ord.train.m <- cbind(ord.train.m, tsne$Y[train, ])
-  ord.test.m <- cbind(ord.test.m, tsne$Y[test, ])
-  ohe.train.m <- cbind(ohe.train.m, tsne$Y[train, ])
-  ohe.test.m <- cbind(ohe.test.m, tsne$Y[test, ])
+  # ord.train.m <- cbind(ord.train.m, tsne$Y[train, ])
+  # ord.test.m <- cbind(ord.test.m, tsne$Y[test, ])
 }
-
-
-# Center, scale, and drop outliers
-pp <- preProcess(ord.m, method = c("center", "scale"), na.remove = FALSE)
-ord.m.pp <- predict(pp, as.matrix(ord.m))
-ord.train.pp <- ord.m.pp[train, ]
-ord.test.pp <- ord.m.pp[test, ]
-
 
 # Pointers to xgb matrices
 ord.train.xgb <- xgb.DMatrix(data = ord.train.m, label = y.train)
 ord.test.xgb <- xgb.DMatrix(data = ord.train.m)
 
-ohe.train.xgb <- xgb.DMatrix(data = ohe.train.m, label = y.train)
-ohe.test.xgb <- xgb.DMatrix(data = ohe.train.m)
 
 #options(na.action=previous_na_action$na.action)
 # MISC --------------------------------------------------------------------

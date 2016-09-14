@@ -1,4 +1,3 @@
-
 # Global Tuning -----------------------------------------------------------
 
 set.seed(69)
@@ -12,14 +11,14 @@ if (tune.bays.xgb == TRUE) {
   cv.folds.bayes <- KFold(getinfo(ord.train.xgb, 'label'), nfolds = 5, stratified = FALSE, seed = 0)
   
   xgb.bayes.opt <- BayesianOptimization(xgbCvBayes,
-                              bounds = list(max.depth = c(1L, 15L),
-                                            subsample = c(0.3, 0.9),
-                                            colsample_bytree = c(0.3, 0.9),
-                                            eta = c(0.01, 0.1),
-                                            min_child_weight = c(1L,15L),
-                                            nrounds = c(500L,1200L)),
-                              init_points = 15, n_iter = 30, acq = "ei", 
-                              kappa = 3, eps = 0.5, verbose = TRUE)
+                                        bounds = list(max.depth = c(1L, 15L),
+                                                      subsample = c(0.3, 0.9),
+                                                      colsample_bytree = c(0.3, 0.9),
+                                                      eta = c(0.01, 0.1),
+                                                      min_child_weight = c(1L,15L),
+                                                      nrounds = c(500L,1200L)),
+                                        init_points = 15, n_iter = 30, acq = "ei", 
+                                        kappa = 3, eps = 0.5, verbose = TRUE)
 }
 
 
@@ -27,17 +26,19 @@ if (tune.bays.xgb == TRUE) {
 tune.caret.xgb <- FALSE
 if (tune.caret.xgb == TRUE) {
   xgb.caret.train <- train(x = ord.train.m, y = y.train,
-                       method = "xgbTree",
-                       metric = "RMSE",
-                       tuneGrid = XGB_CARET_TUNE_GRID,
-                       trControl = CARET_TRAIN_CTRL)
+                           method = "xgbTree",
+                           metric = "RMSE",
+                           tuneGrid = XGB_CARET_TUNE_GRID,
+                           trControl = CARET_TRAIN_CTRL)
 }
 
 # check performance
 check.base.xgb <- FALSE
 if (check.base.xgb == TRUE) {
-  xgb.ord.cv <- xgbCVPerformance(model.parameters = XGB_PARS, predictors = ord.train.m, y = y.train)
-  xgb.ohe.cv <- xgbCVPerformance(model.parameters = XGB_PARS, predictors = ohe.train.m, y = y.train)
+  xgb.b.cv <- xgbCVPerformance(model.parameters = XGB_PARS, predictors = ord.train.b.m, y = y.train)
+  xgb.cv <- xgbCVPerformance(model.parameters = XGB_PARS, predictors = ord.train.m, y = y.train)
+  xgb.tsne.cv <- xgbCVPerformance(model.parameters = XGB_PARS, 
+                                  predictors = cbind(ord.train.b.m, tsne$Y[train, ]), y = y.train)
 }
 
 
@@ -46,16 +47,16 @@ if (check.base.xgb == TRUE) {
 tune.caret.rf <- TRUE
 if (tune.caret.rf == TRUE) {
   rf.caret.train <- train(x = ord.train.m, y = y.train,
-                       method = "rf",
-                       metric = "RMSE",
-                       tuneGrid = RF_CARET_TUNE_GRID,
-                       trControl = CARET_TRAIN_CTRL)
+                          method = "rf",
+                          metric = "RMSE",
+                          tuneGrid = RF_CARET_TUNE_GRID,
+                          trControl = CARET_TRAIN_CTRL)
 }
 
 # check performance
 check.rf <- FALSE
 if (check.rf == TRUE) {
-  rf.ord.cv <- rfCVPerformance(model.parameters = RF_PARS, predictors = ord.train.m, y = y.train)
+  rf.ord.cv <- rfCVPerformance(model.parameters = RF_PARS, predictors = ord.train.b.m, y = y.train)
 }
 
 
@@ -85,10 +86,10 @@ if (knn.sa == TRUE) {
 tune.caret.knn <- TRUE
 if (tune.caret.kn == TRUE) {
   knn.caret.train <- train(x = as.matrix(data.frame(ord.train.m)[, PREDICTOR_ATTR]), y = y.train,
-                          method = "knn",
-                          metric = "RMSE",
-                          tuneGrid = KNN_CARET_TUNE_GRID,
-                          trControl = CARET_TRAIN_CTRL)
+                           method = "knn",
+                           metric = "RMSE",
+                           tuneGrid = KNN_CARET_TUNE_GRID,
+                           trControl = CARET_TRAIN_CTRL)
 }
 
 # check performance
