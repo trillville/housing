@@ -103,7 +103,7 @@ REJECTED_ATTR <-c("BsmtFinSF2"            ,"LowQualFinSF"          ,"BsmtHalfBat
                   "Fence.GdWo"            ,"Fence.MnWw"            ,"MiscFeature..MISSING." ,"MiscFeature.Gar2"     ,
                   "MiscFeature.Othr"      ,"MiscFeature.Shed"      ,"MiscFeature.TenC"      ,"SaleType..MISSING."   ,
                   "SaleType.COD"          ,"SaleType.Con"          ,"SaleType.ConLD"        ,"SaleType.ConLI"       ,
-                  "SaleType.ConLw"        ,"SaleType.CWD"          ,"SaleType.Oth"          ,"SaleType.WD"          ,
+                  "SaleType.ConLw"        ,"SaleType.CWD"          ,"SaleTyep.Oth"          ,"SaleType.WD"          ,
                   "SaleCondition.Abnorml" ,"SaleCondition.AdjLand" ,"SaleCondition.Alloca"  ,"SaleCondition.Family" ,
                   "SaleCondition.Normal"  ,"SaleCondition.Partial" ,"Porch3Ssn"            )
 
@@ -138,19 +138,30 @@ CARET_TRAIN_CTRL <- trainControl(method="repeatedCV",
 
 XGB_PARS <- list(objective = "reg:linear",
                  eval_metric = "rmse",
-                 nrounds=1000,
+                 nrounds=1300,
                  max_depth=5,
-                 eta=0.03,
-                 gamma=0.1,
+                 eta=0.01,
+                 gamma=0.0,
                  subsample = 0.9,
                  colsample_bytree=0.5,
                  min_child_weight=1)
 
-RF_PARS <- list(ntree = 800,
-                mtry = 50)
+XGB_PARS2 <- list(objective = "reg:linear",
+                 eval_metric = "rmse",
+                 nrounds=1300,
+                 max_depth=3,
+                 eta=0.01,
+                 gamma=0.0,
+                 colsample_bytree=0.5,
+                 min_child_weight=5)
 
-KNN3_PARS <- expand.grid(k = 3)
-KNN7_PARS <- expand.grid(k = 7)
+
+LAS_PARS <- list(lambda = 0.2)
+
+RF_PARS <- list(ntree = 800,
+                mtry = 29)
+
+KNN5_PARS <- expand.grid(k = 5)
 KNN10_PARS <- expand.grid(k = 10)
 
 XGB_CARET_TUNE_GRID <-  expand.grid(nrounds=seq(100,1200, by = 100), 
@@ -163,4 +174,4 @@ XGB_CARET_TUNE_GRID <-  expand.grid(nrounds=seq(100,1200, by = 100),
 RF_CARET_TUNE_GRID <- expand.grid(mtry = c(15, 20, 25, 30, 40, 50, 60, 80, 100, 130, 160))
 
 
-KNN_CARET_TUNE_GRID <- expand.grid(k = c(1, 2, 3, 5, 7, 10))
+KNN_CARET_TUNE_GRID <- expand.grid(k = c(1, 2, 3, 5, 7, 10, 15))

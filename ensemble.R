@@ -2,7 +2,7 @@
 # Using OHE and ORD encodings
 
 set.seed(100)
-runs <- 50
+runs <- 100
 train.ind <- 1:length(y.train)
 train.length <- length(y.train)
 
@@ -20,12 +20,30 @@ for (n in 1:runs) {
   tmpY1 <- y.train[tmpS1]
   
   # add models here
-  ord.rf1 <- randomForest(x = as.matrix(ord.tmpX2.b), y = tmpY2, replace=F, ntree=800, do.trace=F, mtry = 50)
+  ord.rf1 <- randomForest(x = ord.tmpX2.b, y = tmpY2, mtry = 29, ntree = 800)
   
   ord.xg1 <- do.call(xgboost,
                      c(list(data = ord.tmpX2,
                             label = tmpY2),
                        XGB_PARS))
+  
+  ord.las1 <- train(x = ord.tmpX2.b, y = tmpY2,
+                    method = "lasso",
+                    metric = "RMSE",
+                    tuneGrid = expand.grid(fraction = 0.7222222),
+                    trControl = trainControl("none"))
+  
+  ord.knn5 <- train(x = ord.tmpX2.b, y = tmpY2,
+                    method = "knn",
+                    metric = "RMSE",
+                    tuneGrid = KNN5_PARS,
+                    trControl = trainControl("none"))
+  
+  ord.knn10 <- train(x = ord.tmpX2.b, y = tmpY2,
+                     method = "knn",
+                     metric = "RMSE",
+                     tuneGrid = KNN10_PARS,
+                     trControl = trainControl("none"))
   
   # predict first model
   ord.tmpX2 <- predict(ord.rf1, as.matrix(ord.tmpX1.b), type="response")
@@ -34,6 +52,16 @@ for (n in 1:runs) {
   # aggregate model predictions
   ord.tmpX2 <- cbind(ord.tmpX2,predict(ord.xg1, ord.tmpX1))
   ord.tmpX3 <- cbind(ord.tmpX3,predict(ord.xg1, ord.test.m))
+  
+  ord.tmpX2 <- cbind(ord.tmpX2,predict(ord.knn5, as.matrix(ord.tmpX1.b)))
+  ord.tmpX3 <- cbind(ord.tmpX3,predict(ord.knn5, as.matrix(ord.test.b.m)))
+  
+  ord.tmpX2 <- cbind(ord.tmpX2,predict(ord.knn10, as.matrix(ord.tmpX1.b)))
+  ord.tmpX3 <- cbind(ord.tmpX3,predict(ord.knn10, as.matrix(ord.test.b.m)))
+  
+  ord.tmpX2 <- cbind(ord.tmpX2,predict(ord.las1, as.matrix(ord.tmpX1)))
+  ord.tmpX3 <- cbind(ord.tmpX3,predict(ord.las1, as.matrix(ord.test.b.m)))
+  
   
   # run xgboost on stacked predictions
   ord.bst <- do.call(xgboost,

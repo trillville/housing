@@ -21,8 +21,8 @@ num.attr <- DATA_ATTR_TYPES$integer
 
 # preprocess numeric variables
 raw.num <- raw.all[, num.attr]
-# col 1 = ID, col 37 = Saleprice (convert this to a simple log)
-pp <- preProcess(raw.num[, -c(1,37)], method = c("center", "scale"), na.action = na.pass)
+# col 1 = ID, col 36 = Saleprice (convert this to a simple log)
+pp <- preProcess(raw.num[, -c(1,36)], method = c("center", "scale"), na.action = na.pass)
 pp.num <- predict(pp, newdata = raw.num)
 pp.num$SalePrice <- log(pp.num$SalePrice)
 pp.num[is.na(pp.num)] <- -1
@@ -120,6 +120,8 @@ ord.dummies <- dummyVars(~ ., dat.ord)
 ord.m <- predict(ord.dummies, dat.ord)
 ord.b.m <- as.matrix(data.frame(ord.m)[, PREDICTOR_ATTR])
 
+ord.train <- dat.ord[train, ]
+ord.test <- dat.ord[test, ]
 ord.train.m <- ord.m[train, ]
 ord.test.m <- ord.m[test, ]
 ord.train.b.m <- ord.b.m[train, ]

@@ -46,10 +46,10 @@ if (check.base.xgb == TRUE) {
 
 tune.caret.rf <- TRUE
 if (tune.caret.rf == TRUE) {
-  rf.caret.train <- train(x = ord.train.m, y = y.train,
+  rf.caret.train <- train(x = ord.train.b.m, y = y.train,
                           method = "rf",
                           metric = "RMSE",
-                          tuneGrid = RF_CARET_TUNE_GRID,
+                          tuneLength = 8,
                           trControl = CARET_TRAIN_CTRL)
 }
 
@@ -83,7 +83,7 @@ if (knn.sa == TRUE) {
                  trControl = CARET_TRAIN_CTRL)
 }
 
-tune.caret.knn <- TRUE
+tune.caret.knn <- FALSE
 if (tune.caret.kn == TRUE) {
   knn.caret.train <- train(x = as.matrix(data.frame(ord.train.m)[, PREDICTOR_ATTR]), y = y.train,
                            method = "knn",
@@ -95,7 +95,22 @@ if (tune.caret.kn == TRUE) {
 # check performance
 check.knn <- FALSE
 if (check.knn == TRUE) {
-  knn.ord.cv <- rfCVPerformance(model.parameters = RF_PARS, predictors = as.matrix(data.frame(ord.train.m)[, PREDICTOR_ATTR]), y = y.train)
+  knn.ord.cv <- rfCVPerformance(model.parameters = KNN_PARS, predictors = as.matrix(data.frame(ord.train.m)[, PREDICTOR_ATTR]), y = y.train)
+}
+
+
+# Lasso Tuning --------------------------------------------------------------
+tune.caret.lasso <- FALSE
+if (tune.caret.kn == TRUE) {
+  lasso.caret.train <- train(x = as.matrix(data.frame(ord.train.m)[, PREDICTOR_ATTR]), y = y.train,
+                           method = "lasso",
+                           metric = "RMSE",
+                           tuneGrid = expand.grid(fraction = 0.7222222),
+                           trControl = "none")
+}
+
+if (check.knn == TRUE) {
+  knn.ord.cv <- rfCVPerformance(model.parameters = KNN_PARS, predictors = as.matrix(data.frame(ord.train.m)[, PREDICTOR_ATTR]), y = y.train)
 }
 
 
