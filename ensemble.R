@@ -2,7 +2,10 @@
 # Using OHE and ORD encodings
 
 set.seed(100)
-runs <- 100
+runs <- 240
+y.train <- y.train[-OUTLIERS]
+ord.train.b.m <- ord.train.b.m[-OUTLIERS, ]
+ord.train.m <- ord.train.m[-OUTLIERS, ]
 train.ind <- 1:length(y.train)
 train.length <- length(y.train)
 
@@ -27,10 +30,11 @@ for (n in 1:runs) {
                             label = tmpY2),
                        XGB_PARS))
   
-  ord.las1 <- train(x = ord.tmpX2.b, y = tmpY2,
-                    method = "lasso",
+  ord.las1 <- train(x = ord.tmpX2, y = tmpY2,
+                    method = "glmnet",
                     metric = "RMSE",
-                    tuneGrid = expand.grid(fraction = 0.7222222),
+                    tuneGrid = expand.grid(alpha = 0.1,
+                                           lambda = 0.03344592),
                     trControl = trainControl("none"))
   
   ord.knn5 <- train(x = ord.tmpX2.b, y = tmpY2,
@@ -60,7 +64,7 @@ for (n in 1:runs) {
   ord.tmpX3 <- cbind(ord.tmpX3,predict(ord.knn10, as.matrix(ord.test.b.m)))
   
   ord.tmpX2 <- cbind(ord.tmpX2,predict(ord.las1, as.matrix(ord.tmpX1)))
-  ord.tmpX3 <- cbind(ord.tmpX3,predict(ord.las1, as.matrix(ord.test.b.m)))
+  ord.tmpX3 <- cbind(ord.tmpX3,predict(ord.las1, as.matrix(ord.test.m)))
   
   
   # run xgboost on stacked predictions

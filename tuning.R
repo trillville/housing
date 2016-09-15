@@ -1,3 +1,8 @@
+
+
+
+
+
 # Global Tuning -----------------------------------------------------------
 
 set.seed(69)
@@ -102,11 +107,11 @@ if (check.knn == TRUE) {
 # Lasso Tuning --------------------------------------------------------------
 tune.caret.lasso <- FALSE
 if (tune.caret.kn == TRUE) {
-  lasso.caret.train <- train(x = as.matrix(data.frame(ord.train.m)[, PREDICTOR_ATTR]), y = y.train,
-                           method = "lasso",
-                           metric = "RMSE",
-                           tuneGrid = expand.grid(fraction = 0.7222222),
-                           trControl = "none")
+  lasso.caret.train <- train(x = ord.train.m, y = y.train,
+                             method = "glmnet",
+                             metric = "RMSE",
+                             tuneLength = 30,
+                             trControl = CARET_TRAIN_CTRL)
 }
 
 if (check.knn == TRUE) {
