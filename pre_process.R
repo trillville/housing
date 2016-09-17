@@ -133,9 +133,12 @@ use.tsne <- FALSE # makes model worse apparently
 if (use.tsne == TRUE) {
   tsne <- Rtsne(ord.m, check_duplicates = FALSE, pca = FALSE, 
                 perplexity=25, theta=0.1, dims=2)
+  colnames(tsne$Y) <- c("TSNE1", "TSNE2")
   tsne.df <- data.frame(cbind(tsne$Y[train,], y.train))
-  qplot(tsne.df$TSNE1, tsne.df$TSNE2, data = tsne.df, color = tsne.df$y.train) +
-    scale_colour_gradient(limits=c(34.90, 350))#,low="red",high="white")
+  ggplot(data = tsne.df) +
+    geom_point(aes(x = tsne.df$TSNE1, y = tsne.df$TSNE2, color = tsne.df$y.train)) +
+    viridis::scale_fill_viridis() +
+    coord_fixed()#,low="red",high="white")
   
   colnames(tsne$Y) <- c("TSNE1", "TSNE2")
   # need to determine whether or not it makes sense to do TSNE for both OHE and ORD encodings

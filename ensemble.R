@@ -86,7 +86,3 @@ pred.avg.exp <- exp(pred.avg)
 pred.mat <- cbind(Id.test, pred.avg.exp)
 colnames(pred.mat) <- c("Id", "SalePrice")
 write.csv(pred.mat, file = "sub1.csv", row.names = FALSE)
-
-pred.mat2 <- cbind(Id.test, ord.pred/runs)
-colnames(pred.mat2) <- c("Id", "SalePrice")
-write.csv(pred.mat2, file = "sub2.csv", row.names = FALSE)
